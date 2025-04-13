@@ -3,6 +3,7 @@ import requests
 from datetime import datetime
 from dotenv import load_dotenv
 import os
+import csv
 
 
 load_dotenv()
@@ -29,7 +30,7 @@ def get_repo_info(repo_full_name):
     else:
         return None
 
-def get_exploited_cves(keyword="exploited in the wild", results=100):
+def get_exploited_cves(keyword="exploited in the wild", results=200):
     url = f"https://services.nvd.nist.gov/rest/json/cves/2.0?keywordSearch={keyword}&resultsPerPage={results}"
     response = requests.get(url)
     if response.status_code == 200:
@@ -38,8 +39,10 @@ def get_exploited_cves(keyword="exploited in the wild", results=100):
     else:
         return []
 
+from collections import Counter
+
 def extract_github_repos(cve_data):
-    matched_repos = []
+    repo_counter = Counter()
     for vuln in cve_data:
         references = vuln['cve']['references']
         for ref in references:
@@ -47,8 +50,9 @@ def extract_github_repos(cve_data):
             if "github.com" in url:
                 repo_path = extract_repo_name_from_url(url)
                 if repo_path:
-                    matched_repos.append(repo_path)
-    return list(set(matched_repos))
+                    repo_counter[repo_path] += 1
+    return repo_counter  # Returns repo: count mapping
+
 
 def extract_repo_name_from_url(url):
     try:
@@ -57,25 +61,32 @@ def extract_repo_name_from_url(url):
     except:
         return None
 
-def build_final_dataset(min_repo_count=20):
-    cve_list = get_exploited_cves(results=200)
-    repos = extract_github_repos(cve_list)
-    
+def build_final_dataset(min_repo_count=100):
+    cve_list = get_exploited_cves(results=1000)
+    repo_counter = extract_github_repos(cve_list)
+
     dataset = []
-    count = 0
-    
-    for repo in repos:
-        if count >= min_repo_count:
-            break
-        info = get_repo_info(repo)
-        if info:
-            dataset.append(info)
-            count += 1
-    
+    added = 0  
+
+    for repo, vuln_count in repo_counter.items():
+        if vuln_count >= 1 and added < min_repo_count:
+            info = get_repo_info(repo)
+            if info:
+                info['bugs_exploited'] = vuln_count
+                dataset.append(info)
+                added += 1
+
     return dataset
+
 
 
 # Print result
 if __name__ == '__main__':
-    for row in build_final_dataset():
-        print(row)
+    dataset = build_final_dataset()
+
+    with open('repo_data.csv', 'w', newline='') as file:
+        writer = csv.DictWriter(file, fieldnames=['repo', 'created_at', 'age_years', 'bugs_exploited'])
+        writer.writeheader()
+        writer.writerows(dataset)
+
+    print("CSV saved: repo_data.csv")
