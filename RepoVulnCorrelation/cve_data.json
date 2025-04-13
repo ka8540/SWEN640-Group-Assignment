@@ -1,0 +1,17 @@
+[
+    {
+        "cve_id": "CVE-2021-44228",
+        "repo": "apache/logging-log4j2",
+        "description": "Remote code execution in log4j2"
+    },
+    {
+        "cve_id": "CVE-2022-22965",
+        "repo": "spring-projects/spring-framework",
+        "description": "Spring4Shell RCE vulnerability"
+    },
+    {
+        "cve_id": "CVE-2023-33201",
+        "repo": "django/django",
+        "description": "SQL Injection via improper sanitization"
+    }
+]
